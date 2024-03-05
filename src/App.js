@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { Api } from './Api';
+import './App.css'
+import Preloader from './components/Preloader/Preloader';
 
 const ITEMS_PER_PAGE = 50;
 
@@ -12,6 +14,7 @@ const App = () => {
     price: '',
     brand: ''
   });
+  const [isLoading, setIsLoading] = useState(false);
 
   const nextPage = () => {
     setCurrentPage(prevPage => Math.min(prevPage + 1, totalPages));
@@ -23,13 +26,16 @@ const App = () => {
 
   const handleSubmit = async event => {
     event.preventDefault();
+    setIsLoading(true);
 
     try {
       const api = new Api('https://api.valantis.store:41000/', 'Valantis');
       let filterParams = {};
       let filteredItems = [];
 
-      // Определение параметров для фильтрации на стороне сервера и запрос к API
+      // так как API не позволяет делать фильтрацию на стороне сервера с двумя и более параметрами,
+      // определяем, какае параметры переданы в форму, и производим фильтрацию на стороне сервера по первому в приоритете "название-цена-бренд"
+
       if (filter.name !== '' && filter.price === '' && filter.brand === '') {
         filterParams.product = filter.name;
 
@@ -49,14 +55,15 @@ const App = () => {
       const filteredIds = await api.filter(filterParams);
 
       // Выполняем запрос по полученным идентификаторам, если они есть
+
       if (Array.isArray(filteredIds) && filteredIds.length > 0) {
         filteredItems = await api.getItems(filteredIds);
       } else {
-        // Если идентификаторы не найдены, берем продукты из текущего состояния
         filteredItems = products;
       }
 
       // Фильтрация на стороне клиента по оставшимся параметрам
+
       filteredItems = filteredItems.filter(item => {
         return (
           (filter.name === '' || item.product.includes(filter.name)) &&
@@ -70,7 +77,8 @@ const App = () => {
         return isFirstOccurrence;
       });
 
-      // Обновляем состояние продуктов и других необходимых данных
+      // Обновляем состояния
+
       setTotalPages(Math.ceil(uniqueItems.length / ITEMS_PER_PAGE));
       setProducts(uniqueItems);
       setCurrentPage(1);
@@ -78,6 +86,9 @@ const App = () => {
 
     } catch (error) {
       console.error('Ошибка при получении данных:', error);
+      alert('Ошибка сервера, попробуйте еще раз');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -100,46 +111,55 @@ const App = () => {
   const currentProducts = products.slice(startIndex, endIndex);
 
   return (
-    <div>
-      <h1>Список продуктов</h1>
-      <form onSubmit={handleSubmit} onKeyPress={handleKeyPress}>
-        <input
-          type="text"
-          placeholder="Название"
-          name="name"
-          value={filter.name}
-          onChange={handleInputChange}
-        />
-        <input
-          type="text"
-          placeholder="Цена"
-          name="price"
-          value={filter.price}
-          onChange={handleInputChange}
-        />
-        <input
-          type="text"
-          placeholder="Бренд"
-          name="brand"
-          value={filter.brand}
-          onChange={handleInputChange}
-        />
-        <button type="submit">Применить фильтр</button>
+    <div className='app'>
+      <h1 className='app__title'>продукты компании</h1>
+
+      <form onSubmit={handleSubmit} onKeyDown={handleKeyPress}>
+        <div className='app__input-container'>
+          <input
+            className='app__input'
+            type="text"
+            placeholder="Название"
+            name="name"
+            value={filter.name}
+            onChange={handleInputChange}
+          />
+          <input
+            className='app__input'
+            type="text"
+            placeholder="Цена"
+            name="price"
+            value={filter.price}
+            onChange={handleInputChange}
+          />
+          <input
+            className='app__input'
+            type="text"
+            placeholder="Бренд"
+            name="brand"
+            value={filter.brand}
+            onChange={handleInputChange}
+          />
+          <button className='app__button' type="submit">Применить фильтр</button>
+        </div>
       </form>
-      <ul>
+
+      {isLoading ? <Preloader /> : null}
+
+      <ul className='app__list'>
         {currentProducts.map(product => (
-          <li key={product.id}>
-            <div>ID: {product.id}</div>
-            <div>Название: {product.product}</div>
-            <div>Цена: {product.price}</div>
-            <div>Бренд: {product.brand}</div>
+          <li className='app__list-item' key={product.id}>
+            <p className='item-text'>ID: {product.id}</p>
+            <p className='item-text'>Название: {product.product}</p>
+            <p className='item-text'>Цена: {product.price}</p>
+            <p className='item-text'>Бренд: {product.brand}</p>
           </li>
         ))}
       </ul>
-      <div>
-        <button onClick={prevPage} disabled={currentPage === 1}>Предыдущая страница</button>
+      <div className='app__selector-container'>
+        <button className='app__selector-button' onClick={prevPage} disabled={currentPage === 1}>Предыдущая страница</button>
         <span> Страница {currentPage} из {totalPages} </span>
-        <button onClick={nextPage} disabled={currentPage === totalPages}>Следующая страница</button>
+        <button className='app__selector-button' onClick={nextPage} disabled={currentPage === totalPages}>Следующая страница</button>
       </div>
     </div>
   );
