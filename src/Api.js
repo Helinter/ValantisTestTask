@@ -6,7 +6,7 @@ class Api {
     this.authToken = authToken;
   }
 
-  async getIds(offset = 0, limit = 100) {
+  async getIds(offset = 0, limit = 50) {
     try {
       const authToken = this.generateAuthToken();
       const response = await fetch(this.apiUrl, {
