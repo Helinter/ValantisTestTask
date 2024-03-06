@@ -6,6 +6,7 @@ import Preloader from './components/Preloader/Preloader';
 const ITEMS_PER_PAGE = 50;
 
 const App = () => {
+
   const [products, setProducts] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
@@ -24,12 +25,14 @@ const App = () => {
     setCurrentPage(prevPage => Math.max(prevPage - 1, 1));
   };
 
+  const api = new Api('https://api.valantis.store:41000/', 'Valantis');
+
   const handleSubmit = async event => {
+
     event.preventDefault();
     setIsLoading(true);
 
     try {
-      const api = new Api('https://api.valantis.store:41000/', 'Valantis');
       let filterParams = {};
       let filteredItems = [];
 
@@ -77,16 +80,18 @@ const App = () => {
         return isFirstOccurrence;
       });
 
-      // Обновляем состояния
-
       setTotalPages(Math.ceil(uniqueItems.length / ITEMS_PER_PAGE));
       setProducts(uniqueItems);
       setCurrentPage(1);
 
 
     } catch (error) {
-      console.error('Ошибка при получении данных:', error);
-      alert('Ошибка сервера, попробуйте еще раз');
+      if (error.response) {
+        console.error('Ошибка при получении данных:', error, error.response.status);
+      }
+      // в случае ошибки сервера повторяем запрос
+
+      handleSubmit(event);
     } finally {
       setIsLoading(false);
     }
@@ -101,7 +106,7 @@ const App = () => {
   };
 
   const handleKeyPress = event => {
-    if (event.key === 'Enter') {
+    if (event.key === 'Enter' && !isFormEmpty && !isLoading) {
       handleSubmit(event);
     }
   };
@@ -109,6 +114,8 @@ const App = () => {
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
   const endIndex = startIndex + ITEMS_PER_PAGE;
   const currentProducts = products.slice(startIndex, endIndex);
+
+  const isFormEmpty = !filter.name.trim() && !filter.price.trim() && !filter.brand.trim();
 
   return (
     <div className='app'>
@@ -140,7 +147,7 @@ const App = () => {
             value={filter.brand}
             onChange={handleInputChange}
           />
-          <button className='app__button' type="submit">Применить фильтр</button>
+          <button className='app__button' type="submit" disabled={isFormEmpty || isLoading}>Применить фильтр</button>
         </div>
       </form>
 
@@ -157,9 +164,11 @@ const App = () => {
         ))}
       </ul>
       <div className='app__selector-container'>
-        <button className='app__selector-button' onClick={prevPage} disabled={currentPage === 1}>Предыдущая страница</button>
-        <span> Страница {currentPage} из {totalPages} </span>
-        <button className='app__selector-button' onClick={nextPage} disabled={currentPage === totalPages}>Следующая страница</button>
+        <button className='app__selector-button' onClick={prevPage} disabled={currentPage === 1 || currentProducts.length === 0}>Предыдущая страница</button>
+        {currentProducts.length > 0 && (
+          <span> Страница {currentPage} из {totalPages} </span>
+        )}
+        <button className='app__selector-button' onClick={nextPage} disabled={currentPage === totalPages || currentProducts.length === 0}>Следующая страница</button>
       </div>
     </div>
   );
