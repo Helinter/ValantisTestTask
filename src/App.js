@@ -54,6 +54,7 @@ const App = () => {
         setTotalPages(prevTotalPages => prevTotalPages + Math.ceil(nextProducts.length / ITEMS_PER_PAGE));
       } catch (error) {
         console.error('Ошибка при загрузке данных:', error);
+        await nextPage();
       } finally {
         setIsLoading(false);
       }
