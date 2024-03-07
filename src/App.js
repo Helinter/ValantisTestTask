@@ -10,17 +10,15 @@ const App = () => {
   const [products, setProducts] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadedItems, setLoadedItems] = useState(0);
+  const [hasSubmitted, setHasSubmitted] = useState(false);
+  const api = new Api('https://api.valantis.store:41000/', 'Valantis');
   const [filter, setFilter] = useState({
     name: '',
     price: '',
     brand: ''
   });
-  const [isLoading, setIsLoading] = useState(true);
-
-  const [loadedItems, setLoadedItems] = useState(0);
-  const [hasSubmitted, setHasSubmitted] = useState(false);
-
-  const api = new Api('https://api.valantis.store:41000/', 'Valantis');
 
   useEffect(() => {
     const loadInitialData = async () => {
@@ -28,32 +26,32 @@ const App = () => {
       try {
         const initialIds = await api.getIds(0, 300);
         const initialProducts = await api.getItems(initialIds);
-        setTotalPages(Math.ceil(initialProducts.length / ITEMS_PER_PAGE));
-        setProducts(initialProducts);
+        const uniqueItems = initialProducts.filter((item, index, self) => {
+          const isFirstOccurrence = index === self.findIndex((t) => t.id === item.id);
+          return isFirstOccurrence;
+        });
+        setTotalPages(Math.ceil(uniqueItems.length / ITEMS_PER_PAGE));
+        setProducts(uniqueItems);
         setLoadedItems(300);
         setIsLoading(false);
       } catch (error) {
         console.error('Ошибка при загрузке данных:', error);
-
         loadInitialData();
       }
     };
-
     loadInitialData();
   }, []);
-
-
 
   const nextPage = async () => {
     if (currentPage === totalPages - 1 && isFormEmpty && !hasSubmitted) {
       setIsLoading(true);
       try {
+        setCurrentPage(prevPage => prevPage + 1);
         const nextIds = await api.getIds(loadedItems, 300);
         const nextProducts = await api.getItems(nextIds);
         setProducts(prevProducts => [...prevProducts, ...nextProducts]);
         setLoadedItems(prevOffset => prevOffset + nextProducts.length);
         setTotalPages(prevTotalPages => prevTotalPages + Math.ceil(nextProducts.length / ITEMS_PER_PAGE));
-        setCurrentPage(prevPage => prevPage + 1);
       } catch (error) {
         console.error('Ошибка при загрузке данных:', error);
       } finally {
@@ -64,7 +62,6 @@ const App = () => {
     }
   };
 
-
   const prevPage = () => {
     setCurrentPage(prevPage => Math.max(prevPage - 1, 1));
   };
@@ -73,14 +70,12 @@ const App = () => {
     event.preventDefault();
     setIsLoading(true);
     setHasSubmitted(true);
-
     try {
       let filterParams = {};
       let filteredItems = [];
 
       // так как API не позволяет делать фильтрацию на стороне сервера с двумя и более параметрами,
       // определяем, какае параметры переданы в форму, и производим фильтрацию на стороне сервера по первому в приоритете "название-цена-бренд"
-
       if (filter.name !== '' && filter.price === '' && filter.brand === '') {
         filterParams.product = filter.name;
       } else if (filter.name === '' && filter.price !== '' && filter.brand === '') {
@@ -96,7 +91,6 @@ const App = () => {
       const filteredIds = await api.filter(filterParams);
 
       // Выполняем запрос по полученным идентификаторам, если они есть
-
       if (Array.isArray(filteredIds) && filteredIds.length > 0) {
         filteredItems = await api.getItems(filteredIds);
       } else {
@@ -104,7 +98,6 @@ const App = () => {
       }
 
       // Фильтрация на стороне клиента по оставшимся параметрам
-
       filteredItems = filteredItems.filter(item => {
         return (
           (filter.name === '' || item.product.includes(filter.name)) &&
@@ -149,7 +142,6 @@ const App = () => {
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
   const endIndex = startIndex + ITEMS_PER_PAGE;
   const currentProducts = products.slice(startIndex, endIndex);
-
   const isFormEmpty = !filter.name.trim() && !filter.price.trim() && !filter.brand.trim();
 
   return (
