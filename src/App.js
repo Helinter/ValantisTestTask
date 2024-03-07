@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Api } from './Api';
 import './App.css'
 import Preloader from './components/Preloader/Preloader';
@@ -15,22 +15,64 @@ const App = () => {
     price: '',
     brand: ''
   });
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const nextPage = () => {
-    setCurrentPage(prevPage => Math.min(prevPage + 1, totalPages));
+  const [loadedItems, setLoadedItems] = useState(0);
+  const [hasSubmitted, setHasSubmitted] = useState(false);
+
+  const api = new Api('https://api.valantis.store:41000/', 'Valantis');
+
+  useEffect(() => {
+    const loadInitialData = async () => {
+      setIsLoading(true);
+      try {
+        const initialIds = await api.getIds(0, 300);
+        const initialProducts = await api.getItems(initialIds);
+        setTotalPages(Math.ceil(initialProducts.length / ITEMS_PER_PAGE));
+        setProducts(initialProducts);
+        setLoadedItems(300);
+        setIsLoading(false);
+      } catch (error) {
+        console.error('Ошибка при загрузке данных:', error);
+
+        loadInitialData();
+      }
+    };
+
+    loadInitialData();
+  }, []);
+
+
+
+  const nextPage = async () => {
+    if (currentPage === totalPages - 1 && isFormEmpty && !hasSubmitted) {
+      setIsLoading(true);
+      try {
+        const nextIds = await api.getIds(loadedItems, 300);
+        const nextProducts = await api.getItems(nextIds);
+        setProducts(prevProducts => [...prevProducts, ...nextProducts]);
+        setLoadedItems(prevOffset => prevOffset + nextProducts.length);
+        setTotalPages(prevTotalPages => prevTotalPages + Math.ceil(nextProducts.length / ITEMS_PER_PAGE));
+        setCurrentPage(prevPage => prevPage + 1);
+      } catch (error) {
+        console.error('Ошибка при загрузке данных:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    } else {
+      setCurrentPage(prevPage => Math.min(prevPage + 1, totalPages));
+    }
   };
+
 
   const prevPage = () => {
     setCurrentPage(prevPage => Math.max(prevPage - 1, 1));
   };
 
-  const api = new Api('https://api.valantis.store:41000/', 'Valantis');
-
   const handleSubmit = async event => {
-
     event.preventDefault();
     setIsLoading(true);
+    setHasSubmitted(true);
 
     try {
       let filterParams = {};
@@ -41,17 +83,13 @@ const App = () => {
 
       if (filter.name !== '' && filter.price === '' && filter.brand === '') {
         filterParams.product = filter.name;
-
       } else if (filter.name === '' && filter.price !== '' && filter.brand === '') {
         filterParams.price = parseFloat(filter.price);
-
       } else if (filter.name === '' && filter.price === '' && filter.brand !== '') {
         filterParams.brand = filter.brand;
-      }
-      else if (filter.name === '' && filter.price !== '' && filter.brand !== '') {
+      } else if (filter.name === '' && filter.price !== '' && filter.brand !== '') {
         filterParams.price = parseFloat(filter.price);
-      }
-      else if (filter.name !== '') {
+      } else if (filter.name !== '') {
         filterParams.product = filter.name;
       }
 
@@ -83,14 +121,11 @@ const App = () => {
       setTotalPages(Math.ceil(uniqueItems.length / ITEMS_PER_PAGE));
       setProducts(uniqueItems);
       setCurrentPage(1);
-
-
     } catch (error) {
       if (error.response) {
         console.error('Ошибка при получении данных:', error, error.response.status);
       }
-      // в случае ошибки сервера повторяем запрос
-
+      setIsLoading(true);
       handleSubmit(event);
     } finally {
       setIsLoading(false);
